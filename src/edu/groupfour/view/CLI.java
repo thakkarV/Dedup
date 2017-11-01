@@ -1,13 +1,13 @@
-package edu.groupfour;
+package edu.groupfour.view;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.commons.cli.*;
 
- class CLI {
+ public class CLI {
 
-     CLI(String [] args) {
+     public CLI(String [] args) {
         this.args = args;
 
         this.options = new Options();
@@ -17,7 +17,7 @@ import org.apache.commons.cli.*;
         options.addOption("d", "deleteFile", true, "Name of the file to be deleted from the locker.");
     }
 
-    CommandLine parse() {
+    public CommandLine parse() {
         CommandLineParser parser = new DefaultParser();
         CommandLine cmdline = null;
 
