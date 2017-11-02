@@ -18,8 +18,10 @@ public class Main {
 
         Locker locker = new Locker(parsedArgs.getOptionValue("l"));
 
-        locker.addFile("document1.txt");
-        locker.addFile("document2.txt");
+        if(parsedArgs.hasOption("a")){
+            System.out.println("Adding file " + parsedArgs.getOptionValue("a") + " to locker!");
+            locker.addFile(parsedArgs.getOptionValue("a"));
+        }
 
         locker.save();
 

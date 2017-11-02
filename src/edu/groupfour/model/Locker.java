@@ -12,11 +12,11 @@ public class Locker {
 
     public Locker(){
         files = new ArrayList<>();
-        path = System.getProperty("user.dir") + "\\locker.txt"; //temporarily just using the default path of the process
+        path = System.getProperty("user.dir"); //temporarily just using the default path of the process
     }
 
     public Locker(String path){
-        this.path = path + "\\locker.txt"; //temporarily just using the default path of the process
+        this.path = path; //temporarily just using the default path of the process
         files = new ArrayList<>();
     }
 
@@ -28,7 +28,7 @@ public class Locker {
         FileInputStream in = null;
         FileOutputStream out = null;
         try{
-            out = new FileOutputStream(path); //open the locker
+            out = new FileOutputStream(path, true); //open the locker
             for(String file : files){
                 in = new FileInputStream(file); //open each file to add to locker
                 int c;
@@ -37,6 +37,9 @@ public class Locker {
                     out.write(c);
                 }
             }
+        } catch (IOException e) {
+            System.out.println(e.getMessage());
+            System.exit(1);
         } finally {
             if (in != null) {
                 in.close();
@@ -44,6 +47,7 @@ public class Locker {
             if (out != null) {
                 out.close();
             }
+            //System.exit(1);
         }
 
     }
