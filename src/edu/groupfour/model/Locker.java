@@ -3,12 +3,15 @@ package edu.groupfour.model;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashMap;
 
-public class Locker {
+public class Locker implements Serializable{
 
     private String path; //path to locker
-    private ArrayList<String> files; //paths of the files that are to be added to the locker
+    private ArrayList<LockerFile> files; //paths of the files that are to be added to the locker
+    private HashMap<FileChunkHash, FileChunk> chunkMap;
 
     public Locker(){
         files = new ArrayList<>();
@@ -16,12 +19,10 @@ public class Locker {
     }
 
     public Locker(String path){
-        this.path = path; //temporarily just using the default path of the process
-        files = new ArrayList<>();
+        this.path = path;
     }
 
     public void addFile(String filePath) throws IOException{
-        files.add(filePath);
     }
 
     public void save() throws IOException{
