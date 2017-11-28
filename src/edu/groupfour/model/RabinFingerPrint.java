@@ -60,39 +60,45 @@ public class RabinFingerPrint implements FingerPrint {
 
 
         x = (byte) readMe.read();
-        currind++;
         //initloop
         for (int l = 0; l<windowSize; l++){
             window[l] = x;
             nowprint = (nowprint*base + x)%modPrime;
             x = (byte) readMe.read();
             System.out.println(nowprint);
+            currind++;
         }
         x = (byte) readMe.read();
-        currind++;
+
+        long powabunga = 1;
+
+        for (int l = 0; l<windowSize; l++){
+            powabunga = (powabunga*base)%modPrime;
+        }
+
         while (x != -1){
-
             //rabin krap
-            nowprint = (nowprint*base + x - window[whereami]*(((long)Math.pow(base, windowSize))%modPrime))%modPrime;
-
+            nowprint = (nowprint*base + x - window[whereami]*powabunga)%modPrime;
             //update buffer
             window[whereami] = x;
             whereami = (whereami+1)%windowSize;
 
             System.out.println(nowprint);
             //if chunk boundary, update
-            if(nowprint == 57){
+            if(nowprint == 15){
                 indexlist.add(currind);
-
-                //System.out.println(nowprint);
+                System.out.println("FLOOOOSH");
                 //flush le buffer
                 whereami = 0;
+                nowprint = 0;
                 for (int l = 0; l<windowSize; l++){
-                    x = (byte) readMe.read();
-                    currind++;
                     window[l] = x;
                     nowprint = (nowprint*base + x)%modPrime;
+                    x = (byte) readMe.read();
+                    System.out.println(nowprint);
+                    currind++;
                 }
+                currind--;
             }
 
             x = (byte) readMe.read();
