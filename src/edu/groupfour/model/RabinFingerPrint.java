@@ -10,8 +10,8 @@ import java.util.ArrayList;
 
 public class RabinFingerPrint implements FingerPrint {
     //private String polynomial;
-    private int mod = 101;
-    private int prime = 256;
+    private int mod = 6199;
+    private int prime = 101;
     private int windowSize = 8; // how large the hash window is in terms of bytes
     byte[] window;
     private int threshold = 8; // how many LSB's need to be zero to be considered a boundary
@@ -45,7 +45,7 @@ public class RabinFingerPrint implements FingerPrint {
 */
 
     // returns the array list of indexes of where the chunks should begin
-    public ArrayList<Long> getChunkBoundaries(String infile) throws IOException{
+    public ArrayList<Long> getChunkBoundaries(String infile, int testval) throws IOException{
 
         //open file
         FileInputStream readMe = new FileInputStream(infile);
@@ -60,16 +60,16 @@ public class RabinFingerPrint implements FingerPrint {
         inByte = (byte) readMe.read();
         //initloop
 
-        System.out.print("Initial rollingHashes: ");
+       // System.out.print("Initial rollingHashes: ");
         for (int l = 0; l < windowSize; l++){
             window[l] = inByte;
             rollingHash = (rollingHash * prime + inByte) % mod;
             inByte = (byte) readMe.read();
             currentIndex++;
 
-            System.out.print(rollingHash + " ");
+            //System.out.print(rollingHash + " ");
         }
-        System.out.println();
+        //System.out.println();
         inByte = (byte) readMe.read();
 
         long p_n = 1;
@@ -87,7 +87,7 @@ public class RabinFingerPrint implements FingerPrint {
 
             //System.out.println(rollingHash);
             //if chunk boundary, update
-            if(rollingHash == 896){
+            if(rollingHash == testval){
                 indexlist.add(currentIndex);
                 //System.out.println("FLOOOOSH");
                 //flush le buffer
