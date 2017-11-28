@@ -32,7 +32,6 @@ public class Locker implements Serializable {
         this.chunkMap = new HashMap<>();
         this.files = new ArrayList<>();
 		this.mapLock = new ReentrantReadWriteLock();
-		this.rabinLock = new ReentrantReadWriteLock();
 		// rabin will be loaded by the load function since it is locker dependent
         if(!isNewLocker) {
             try {
@@ -62,7 +61,6 @@ public class Locker implements Serializable {
         this.chunkMap = new HashMap<>();
         this.files = new ArrayList<>();
 		this.mapLock = new ReentrantReadWriteLock();
-		this.rabinLock = new ReentrantReadWriteLock();
         // rabin will be loaded by the load function since it is locker dependent
         if(!isNewLocker) {
             try {
