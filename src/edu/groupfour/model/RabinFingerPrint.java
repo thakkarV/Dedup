@@ -69,6 +69,7 @@ public class RabinFingerPrint implements FingerPrint {
 
             System.out.print(rollingHash + " ");
         }
+        System.out.println();
         inByte = (byte) readMe.read();
 
         long p_n = 1;
@@ -79,16 +80,16 @@ public class RabinFingerPrint implements FingerPrint {
 
         while (inByte != -1){
             // rabin krap
-            rollingHash = (rollingHash*prime + inByte - window[windowIndex]*p_n)%mod;
+            rollingHash = (rollingHash*prime + inByte - (window[windowIndex]*p_n)%mod)%mod;
             // update buffer
             window[windowIndex] = inByte;
             windowIndex = (windowIndex + 1) % windowSize;
 
-            System.out.println(rollingHash);
+            //System.out.println(rollingHash);
             //if chunk boundary, update
-            if(rollingHash == 15){
+            if(rollingHash == 896){
                 indexlist.add(currentIndex);
-                System.out.println("FLOOOOSH");
+                //System.out.println("FLOOOOSH");
                 //flush le buffer
                 windowIndex = 0;
                 rollingHash = 0;
@@ -96,7 +97,7 @@ public class RabinFingerPrint implements FingerPrint {
                     window[l] = inByte;
                     rollingHash = (rollingHash*prime + inByte)%mod;
                     inByte = (byte) readMe.read();
-                    System.out.println(rollingHash);
+                    //System.out.println(rollingHash);
                     currentIndex++;
                 }
                 currentIndex--;
