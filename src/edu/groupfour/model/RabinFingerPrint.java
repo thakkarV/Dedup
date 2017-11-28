@@ -10,7 +10,7 @@ import java.util.ArrayList;
 
 public class RabinFingerPrint implements FingerPrint {
     //private String polynomial;
-    private int mod = 6199;
+    private int mod = 100000;
     private int prime = 101;
     private int windowSize = 8; // how large the hash window is in terms of bytes
     byte[] window;
@@ -67,7 +67,7 @@ public class RabinFingerPrint implements FingerPrint {
             inByte = (byte) readMe.read();
             currentIndex++;
 
-            //System.out.print(rollingHash + " ");
+           // System.out.print(rollingHash + " ");
         }
         //System.out.println();
         inByte = (byte) readMe.read();
@@ -87,7 +87,7 @@ public class RabinFingerPrint implements FingerPrint {
 
             //System.out.println(rollingHash);
             //if chunk boundary, update
-            if(rollingHash == testval){
+            if(rollingHash/10000 == testval){
                 indexlist.add(currentIndex);
                 //System.out.println("FLOOOOSH");
                 //flush le buffer

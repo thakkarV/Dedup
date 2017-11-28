@@ -29,13 +29,11 @@ public class Main {
 
         ArrayList<Long> indexlist = new ArrayList<Long>();
 
-        for (int i = 0; i <= 6198; i++){
+        for (int i = 0; i <= 9; i++){
             indexlist = rp.getChunkBoundaries("test.txt", i);
-            if (i%100 == 0){System.out.println("yoshi");}
-            if (indexlist.size() > 10) {
                 System.out.println(indexlist.size());
-                System.out.print(i);
-            }
+                System.out.println(i);
+
         }
 
 
