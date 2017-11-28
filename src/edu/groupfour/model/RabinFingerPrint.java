@@ -10,22 +10,22 @@ import java.util.ArrayList;
 
 public class RabinFingerPrint implements FingerPrint {
     //private String polynomial;
-    private int modPrime = 101;
-    private int base = 256;
+    private int mod = 101;
+    private int prime = 256;
     private int windowSize = 8; // how large the hash window is in terms of bytes
     byte[] window;
     private int threshold = 8; // how many LSB's need to be zero to be considered a boundary
 
     public RabinFingerPrint(String file) {
         // default parameters of Rsync
-        byte[] window = new byte[windowSize];
+        window = new byte[windowSize];
         // do more stuff here
     }
 
     public RabinFingerPrint(String file, int windowSize, int threshold) {
         this.windowSize = windowSize;
         this.threshold = threshold;
-        byte[] window = new byte[windowSize];
+        window = new byte[windowSize];
         // do more stuff here
     }
 
@@ -33,7 +33,7 @@ public class RabinFingerPrint implements FingerPrint {
 /*    private int InitFingerprint(String input){
         int outprint = 0;
         for (int i = 0; i < input.length(); i++) {
-            outprint = (outprint*modPrime + input.charAt(i))%base;
+            outprint = (outprint*mod + input.charAt(i))%prime;
         }
         return outprint;
     }
@@ -50,59 +50,60 @@ public class RabinFingerPrint implements FingerPrint {
         //open file
         FileInputStream readMe = new FileInputStream(infile);
 
-        long currind = 0; //current index in file
-        byte x; //current input byte
-        long nowprint = 0 ; // current fingerprint
+        long currentIndex = 0; //current index in file
+        byte inByte; //current input byte
+        long rollingHash = 0 ; // current fingerprint
         ArrayList<Long> indexlist = new ArrayList<Long>(); //list to store the chunk boundaries
 
-        byte[] window = new byte[windowSize]; //the window
-        int whereami = 0; //where are we in the window
+        int windowIndex = 0; //where are we in the window
 
-
-        x = (byte) readMe.read();
+        inByte = (byte) readMe.read();
         //initloop
-        for (int l = 0; l<windowSize; l++){
-            window[l] = x;
-            nowprint = (nowprint*base + x)%modPrime;
-            x = (byte) readMe.read();
-            System.out.println(nowprint);
-            currind++;
+
+        System.out.print("Initial rollingHashes: ");
+        for (int l = 0; l < windowSize; l++){
+            window[l] = inByte;
+            rollingHash = (rollingHash * prime + inByte) % mod;
+            inByte = (byte) readMe.read();
+            currentIndex++;
+
+            System.out.print(rollingHash + " ");
         }
-        x = (byte) readMe.read();
+        inByte = (byte) readMe.read();
 
-        long powabunga = 1;
+        long p_n = 1;
 
         for (int l = 0; l<windowSize; l++){
-            powabunga = (powabunga*base)%modPrime;
+            p_n = (p_n*prime)%mod;
         }
 
-        while (x != -1){
-            //rabin krap
-            nowprint = (nowprint*base + x - window[whereami]*powabunga)%modPrime;
-            //update buffer
-            window[whereami] = x;
-            whereami = (whereami+1)%windowSize;
+        while (inByte != -1){
+            // rabin krap
+            rollingHash = (rollingHash*prime + inByte - window[windowIndex]*p_n)%mod;
+            // update buffer
+            window[windowIndex] = inByte;
+            windowIndex = (windowIndex + 1) % windowSize;
 
-            System.out.println(nowprint);
+            System.out.println(rollingHash);
             //if chunk boundary, update
-            if(nowprint == 15){
-                indexlist.add(currind);
+            if(rollingHash == 15){
+                indexlist.add(currentIndex);
                 System.out.println("FLOOOOSH");
                 //flush le buffer
-                whereami = 0;
-                nowprint = 0;
-                for (int l = 0; l<windowSize; l++){
-                    window[l] = x;
-                    nowprint = (nowprint*base + x)%modPrime;
-                    x = (byte) readMe.read();
-                    System.out.println(nowprint);
-                    currind++;
+                windowIndex = 0;
+                rollingHash = 0;
+                for (int l = 0; l < windowSize; l++){
+                    window[l] = inByte;
+                    rollingHash = (rollingHash*prime + inByte)%mod;
+                    inByte = (byte) readMe.read();
+                    System.out.println(rollingHash);
+                    currentIndex++;
                 }
-                currind--;
+                currentIndex--;
             }
 
-            x = (byte) readMe.read();
-            currind++;
+            inByte = (byte) readMe.read();
+            currentIndex++;
         }
         return indexlist;
     }
