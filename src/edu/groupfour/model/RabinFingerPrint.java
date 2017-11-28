@@ -10,9 +10,9 @@ import java.util.ArrayList;
 
 public class RabinFingerPrint implements FingerPrint {
     //private String polynomial;
-    private int mod = 100000;
-    private int prime = 101;
-    private int windowSize = 8; // how large the hash window is in terms of bytes
+    private int mod = 1000000;
+    private int prime = 69691;
+    private int windowSize = 48; // how large the hash window is in terms of bytes
     byte[] window;
     private int threshold = 8; // how many LSB's need to be zero to be considered a boundary
 
@@ -45,7 +45,7 @@ public class RabinFingerPrint implements FingerPrint {
 */
 
     // returns the array list of indexes of where the chunks should begin
-    public ArrayList<Long> getChunkBoundaries(String infile, int testval) throws IOException{
+    public ArrayList<Long> getChunkBoundaries(String infile) throws IOException{
 
         //open file
         FileInputStream readMe = new FileInputStream(infile);
@@ -87,7 +87,7 @@ public class RabinFingerPrint implements FingerPrint {
 
             //System.out.println(rollingHash);
             //if chunk boundary, update
-            if(rollingHash/10000 == testval){
+            if(rollingHash%1000 == 0){ //if lowest 3 digits 0, we boundary. WE CAN CHANGE AVERAGE CHUNK SIZE BY CHANGING MOD VALUE
                 indexlist.add(currentIndex);
                 //System.out.println("FLOOOOSH");
                 //flush le buffer

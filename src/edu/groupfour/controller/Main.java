@@ -29,15 +29,42 @@ public class Main {
 
         ArrayList<Long> indexlist = new ArrayList<Long>();
 
-        for (int i = 0; i <= 9; i++){
-            indexlist = rp.getChunkBoundaries("test.txt", i);
-                System.out.println(indexlist.size());
-                System.out.println(i);
+        indexlist = rp.getChunkBoundaries("test.txt");
+        //STATS
+        System.out.println();
+        System.out.println("Size of Chunk Index List: " + indexlist.size());
+
+        ArrayList<Integer> diff = new ArrayList<>();
+
+        long rhv = 0;
+        for(long i : indexlist){
+            diff.add((int)(i - rhv));
+            rhv = i;
+        }
+
+        System.out.println("Chunk Size Array: " + diff);
+
+        long total = 0;
+        for(int i : diff)
+            total += i;
+        long averageChunkSize = 0;
+        if(diff.size() > 1) {
+            averageChunkSize = total / diff.size();
+
+            System.out.println("Average Chunk Size: " + averageChunkSize);
+
+            int sum = 0;
+            for (Integer i : diff)
+                sum += Math.pow((i - averageChunkSize), 2);
+            System.out.println("Standard Deviation of the Chunk Size: " + Math.sqrt(sum / (diff.size() - 1)));
+        }
 
         }
 
 
+
+
 //        locker.save();
 
-    }
+
 }
