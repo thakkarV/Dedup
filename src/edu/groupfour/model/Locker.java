@@ -7,6 +7,7 @@ import java.nio.file.*;
 import java.rmi.NoSuchObjectException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class Locker implements Serializable {
     // haa! PUNS!
@@ -18,6 +19,7 @@ public class Locker implements Serializable {
     private HashMap<FileChunkHash, FileChunk> chunkMap;
     private RabinFingerPrint rabin;
     transient private boolean isMutated; // true if the chunk map was changed since loading the last state
+    transient private ReentrantReadWriteLock mapLock;
 
     /**
      * Loads or creates a new locker at the specified path.
@@ -29,7 +31,9 @@ public class Locker implements Serializable {
         this.path = path;
         this.chunkMap = new HashMap<>();
         this.files = new ArrayList<>();
-        // rabin will be loaded by the load function since it is locker dependent
+		this.mapLock = new ReentrantReadWriteLock();
+		this.rabinLock = new ReentrantReadWriteLock();
+		// rabin will be loaded by the load function since it is locker dependent
         if(!isNewLocker) {
             try {
                 this.load();
@@ -57,6 +61,8 @@ public class Locker implements Serializable {
         this.path = path;
         this.chunkMap = new HashMap<>();
         this.files = new ArrayList<>();
+		this.mapLock = new ReentrantReadWriteLock();
+		this.rabinLock = new ReentrantReadWriteLock();
         // rabin will be loaded by the load function since it is locker dependent
         if(!isNewLocker) {
             try {
@@ -68,6 +74,7 @@ public class Locker implements Serializable {
             }
         } else {
             this.init(path, chunkSize);
+            this.isMutated = true;
         }
     }
 
@@ -156,6 +163,15 @@ public class Locker implements Serializable {
             for (File f : dirListing) {
                 try {
                     if (f.isFile()) {
+                    	new Thread(() -> {
+                    		try {
+								addFile(f.toString());
+							} catch (IOException e) {
+                    			e.printStackTrace();
+                    			System.exit(1);
+							}
+						}).start();
+                    	
                         this.addFile(f.getPath());
                     }
                 } catch (IOException e) {
@@ -163,24 +179,27 @@ public class Locker implements Serializable {
                     System.exit(1);
                 }
             }
-
         } else {
             // recursively add all the contents of dir and all its child dirs
             if (dirListing == null) {
                 System.out.println("Directory " + dirPath + " is empty. Nothing added to locker.");
                 return;
             }
+            
             for (File f : dirListing) {
-                try {
-                    if (f.isFile())
-                        this.addFile(f.getPath());
-                    else if (f.isDirectory())
-                        this.addDir(f.getPath(), true);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    System.exit(1);
-                }
-            }
+				if (f.isFile()) {
+					new Thread(() -> {
+						try {
+							addFile(f.toString());
+						} catch (IOException e) {
+							e.printStackTrace();
+							System.exit(1);
+						}
+					}).start();
+				}
+				else if (f.isDirectory())
+					this.addDir(f.getPath(), true);
+			}
         }
     }
 
