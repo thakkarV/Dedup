@@ -12,7 +12,7 @@ public class RabinFingerPrint implements FingerPrint {
     //private String polynomial;
     private int mod = 1000000; // Range of the rolling hash values
     private int chunkSize;
-    private int prime = 69691; // 69691;
+    private int prime = 69691;
     private int windowSize = 48; // how large the hash window is in terms of bytes
     byte[] window;
     private int threshold = 8; // how many LSB's need to be zero to be considered a boundary
@@ -34,7 +34,6 @@ public class RabinFingerPrint implements FingerPrint {
 
     // returns the array list of indexes of where the chunks should begin
     public ArrayList<Long> getChunkBoundaries(byte [] byteFile) {
-
         int byteIndex = 0;
         long currentIndex = 0; //current index in file
         byte inByte; //current input byte
@@ -87,7 +86,9 @@ public class RabinFingerPrint implements FingerPrint {
             inByte = byteFile[byteIndex++];
             currentIndex++;
         }
-        indexlist.add((long)byteFile.length - 1);
+        if(!(indexlist.get(indexlist.size() - 1) == (long)byteFile.length - 1))
+            indexlist.add((long)byteFile.length - 1);
+
         return indexlist;
     }
 }

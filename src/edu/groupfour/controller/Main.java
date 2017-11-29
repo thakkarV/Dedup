@@ -6,17 +6,15 @@ import edu.groupfour.view.CLI;
 import edu.groupfour.view.GUI;
 import org.apache.commons.cli.CommandLine;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
+import java.util.Scanner;
 
 
 public class Main {
     public static void main(String[] args) throws IOException{
         //GUI gui = new GUI();
-	    /*CommandLine parsedArgs = new CLI(args).parse();
+        /*CommandLine parsedArgs = new CLI(args).parse();
 
 	    if (parsedArgs.hasOption("l")) {
 	        System.out.println(parsedArgs.getOptionValue("l"));
@@ -29,19 +27,22 @@ public class Main {
             locker.addFile(parsedArgs.getOptionValue("a"));
         }
 */
-        RabinFingerPrint rp = new RabinFingerPrint(10000);
 
-        FileInputStream in = new FileInputStream("test_long.txt");
-        ByteArrayOutputStream b = new ByteArrayOutputStream();
-
-        while(in.available() != 0)
-            b.write(in.read());
+        RabinFingerPrint rp = new RabinFingerPrint(4096);
 
         ArrayList<Long> indexlist = new ArrayList<Long>();
 
-        indexlist = rp.getChunkBoundaries(b.toByteArray());
+        byte[] byteArray = new Scanner(new File("test_long.txt")).useDelimiter("\\Z").next().getBytes();
+
+        long startTime = System.currentTimeMillis();
+        indexlist = rp.getChunkBoundaries(byteArray);
+        long endTime = System.currentTimeMillis();
+
+        long time = endTime - startTime;
+
         //STATS
-        System.out.println();
+        System.out.println("Fingerprinting time: " + time);
+
         System.out.println("Size of Chunk Index List: " + indexlist.size());
 
         ArrayList<Integer> diff = new ArrayList<>();
@@ -52,7 +53,7 @@ public class Main {
             rhv = i;
         }
 
-        System.out.println("File Size: " + b.toByteArray().length);
+        System.out.println("File Size: " + byteArray.length);
 
         System.out.println("Index List: " + indexlist);
 
