@@ -11,6 +11,7 @@ import java.util.ArrayList;
 public class RabinFingerPrint implements FingerPrint {
     //private String polynomial;
     private int mod = 1000000;
+    private int chunkingCoeff = 1000;
     private int prime = 69691;
     private int windowSize = 48; // how large the hash window is in terms of bytes
     byte[] window;
@@ -27,6 +28,7 @@ public class RabinFingerPrint implements FingerPrint {
         this.threshold = threshold;
         window = new byte[windowSize];
         // do more stuff here
+        this.chunkingCoeff = mod / chunkSize;
     }
 
     //Produce fingerprint after cutting a boundary, skips a bunch of unnecessary processing also good to initialize.
@@ -70,14 +72,14 @@ public class RabinFingerPrint implements FingerPrint {
         }
 
         while (inByte != -1) {
-            // Rabin Karp
+            // Rabin Karp - Update rolling hash value for this window
             rollingHash = (rollingHash * prime + inByte - (window[windowIndex] * p_n) % mod) % mod;
             // update buffer
             window[windowIndex] = inByte;
             windowIndex = (windowIndex + 1) % windowSize;
 
             // if chunk boundary, update
-            if(rollingHash % 1000 == 0){
+            if(rollingHash % chunkingCoeff == 0){
                 // if lowest 3 digits 0, we boundary. WE CAN CHANGE AVERAGE CHUNK SIZE BY CHANGING MOD VALUE
                 indexlist.add(currentIndex);
                 // flush le buffer
@@ -94,6 +96,8 @@ public class RabinFingerPrint implements FingerPrint {
 
             inByte = byteFile[byteIndex++];
             currentIndex++;
+
+            indexlist.add((long)byteFile.length);
         }
         return indexlist;
     }

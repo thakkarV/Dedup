@@ -25,11 +25,11 @@ public class Main {
             locker.addFile(parsedArgs.getOptionValue("a"));
         }
 */
-        RabinFingerPrint rp = new RabinFingerPrint("test");
+        //RabinFingerPrint rp = new RabinFingerPrint("test");
 
         ArrayList<Long> indexlist = new ArrayList<Long>();
 
-        indexlist = rp.getChunkBoundaries("test.txt");
+        //indexlist = rp.getChunkBoundaries("test.txt");
         //STATS
         System.out.println();
         System.out.println("Size of Chunk Index List: " + indexlist.size());
