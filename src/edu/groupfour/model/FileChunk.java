@@ -2,7 +2,7 @@ package edu.groupfour.model;
 
 import java.io.Serializable;
 
-class FileChunk implements Serializable{
+class FileChunk implements Serializable {
     private byte [] payload;
     private int refCounter;
 

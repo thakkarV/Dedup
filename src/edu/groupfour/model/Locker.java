@@ -5,8 +5,9 @@ import com.sun.javaws.exceptions.InvalidArgumentException;
 import java.io.*;
 import java.nio.file.*;
 import java.rmi.NoSuchObjectException;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.*;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class Locker implements Serializable {
@@ -16,8 +17,9 @@ public class Locker implements Serializable {
 
     private String path; //path to locker
     private ArrayList<LockerFile> files; //paths of the files that are to be added to the locker
-    private HashMap<FileChunkHash, FileChunk> chunkMap;
+    private HashMap<String, FileChunk> chunkMap;
     private RabinFingerPrint rabin;
+    private int chunkSize;
     transient private boolean isMutated; // true if the chunk map was changed since loading the last state
     transient private ReentrantReadWriteLock mapLock;
 
@@ -32,6 +34,7 @@ public class Locker implements Serializable {
         this.chunkMap = new HashMap<>();
         this.files = new ArrayList<>();
 		this.mapLock = new ReentrantReadWriteLock();
+		this.chunkSize = 4096;
 		// rabin will be loaded by the load function since it is locker dependent
         if(!isNewLocker) {
             try {
@@ -43,7 +46,7 @@ public class Locker implements Serializable {
             }
         } else {
             // default chunk size is 4 kibibytes
-            this.init(path, 4096);
+            this.init(path);
             this.isMutated = true;
         }
     }
@@ -61,6 +64,7 @@ public class Locker implements Serializable {
         this.chunkMap = new HashMap<>();
         this.files = new ArrayList<>();
 		this.mapLock = new ReentrantReadWriteLock();
+		this.chunkSize = chunkSize;
         // rabin will be loaded by the load function since it is locker dependent
         if(!isNewLocker) {
             try {
@@ -71,7 +75,7 @@ public class Locker implements Serializable {
                 System.exit(1);
             }
         } else {
-            this.init(path, chunkSize);
+            this.init(path);
             this.isMutated = true;
         }
     }
@@ -83,7 +87,7 @@ public class Locker implements Serializable {
      * Then initializes the fingerprinter and saves its parameters to the .locker folder.
      * @param path - path to where the locker folder will be created
      */
-    public void init(String path, int chunkSize) {
+    public void init(String path) {
         // TODO : folder name of the locker could be made changeable for the user to customize
         Path lockerRootPath = Paths.get(path, "Locker");
         if (Files.exists(lockerRootPath, LinkOption.NOFOLLOW_LINKS)) {
@@ -116,8 +120,6 @@ public class Locker implements Serializable {
             System.exit(1);
         }
 
-        this.rabin = new RabinFingerPrint(chunkSize);
-
         try {
             this.save();
         } catch (IOException e) {
@@ -129,19 +131,71 @@ public class Locker implements Serializable {
     /**
      * Adds a single file to the locker.
      * @param filePath - Path to the file to be added to the locker.
-     * @throws IOException - if the file to be added cannot be read from disk.
      */
-    public void addFile(String filePath) throws IOException {
+    public void addFile(String filePath) {
         this.isMutated = true;
+
+        // first read the file as a large string
+        byte [] fileBytes;
+        try {
+            fileBytes = new Scanner(new File(filePath)).useDelimiter("\\Z").next().getBytes();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
+
+        RabinFingerPrint fingerPrint = new RabinFingerPrint(this.chunkSize);
+        ArrayList<Long> boundries = fingerPrint.getChunkBoundaries(fileBytes);
+
+        MessageDigest md;
+        try {
+            md = MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            return;
+        }
+
+        ArrayList<String> lockerFileHashes = new ArrayList<>();
+        Long previous = 0L;
+        for (int i = 0; i < boundries.size() - 1; i++) {
+            // get file substring (chunk) and its MD5 hash
+            int chunkSize = (int)(boundries.get(i) - previous);
+            byte [] chunk = new byte [chunkSize];
+            System.arraycopy(fileBytes, previous.intValue(), chunk, 0, chunkSize);
+
+            byte [] hash = md.digest(chunk);
+            String chunkHash = Base64.getEncoder().encodeToString(hash);
+
+            // now check if this hash exists in the chunk map
+            this.mapLock.readLock().lock();
+            if (this.chunkMap.containsKey(chunkHash)) {
+                // if exists, increase reference to the chunk
+                this.mapLock.writeLock().lock();
+                chunkMap.get(chunkHash).addReference();
+                this.mapLock.writeLock().unlock();
+            } else {
+                // else insert a new chunk to the map
+                FileChunk fileChunk = new FileChunk(chunk);
+                this.mapLock.writeLock().lock();
+                this.chunkMap.put(chunkHash, fileChunk);
+                this.mapLock.writeLock().unlock();
+            }
+            this.mapLock.readLock().unlock();
+
+            lockerFileHashes.add(chunkHash);
+            previous = boundries.get(i);
+        }
+
+        LockerFile lfile = new LockerFile(filePath, lockerFileHashes);
+        this.files.add(lfile);
     }
 
     /**
      * Adds an entire directory's content to the locker.
      * @param dirPath - Path to the directory whose contents are being added to the locker.
      * @param recursiveAdd - If true, adds all subdirectories recursively to the locker.
-     * @throws IOException - if files to be added cannot be read from disk.
      */
-    public void addDir(String dirPath, boolean recursiveAdd) throws IOException {
+    public void addDir(String dirPath, boolean recursiveAdd) {
         this.isMutated = true;
         File dir  = new File(dirPath);
         if (!dir.isDirectory()) {
@@ -159,22 +213,8 @@ public class Locker implements Serializable {
             }
 
             for (File f : dirListing) {
-                try {
-                    if (f.isFile()) {
-                    	new Thread(() -> {
-                    		try {
-								addFile(f.toString());
-							} catch (IOException e) {
-                    			e.printStackTrace();
-                    			System.exit(1);
-							}
-						}).start();
-                    	
-                        this.addFile(f.getPath());
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    System.exit(1);
+                if (f.isFile()) {
+                    new Thread(() -> addFile(f.toString())).start();
                 }
             }
         } else {
@@ -185,16 +225,8 @@ public class Locker implements Serializable {
             }
             
             for (File f : dirListing) {
-				if (f.isFile()) {
-					new Thread(() -> {
-						try {
-							addFile(f.toString());
-						} catch (IOException e) {
-							e.printStackTrace();
-							System.exit(1);
-						}
-					}).start();
-				}
+				if (f.isFile())
+					new Thread(() -> addFile(f.toString())).start();
 				else if (f.isDirectory())
 					this.addDir(f.getPath(), true);
 			}
@@ -214,7 +246,7 @@ public class Locker implements Serializable {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         FileChunk chunk;
-        for (FileChunkHash hash : this.files.get(0).chunkHashes) {
+        for (String hash : this.files.get(0).chunkHashes) {
             chunk = this.chunkMap.get(hash);
             baos.write(chunk.getPayload());
         }
@@ -249,6 +281,7 @@ public class Locker implements Serializable {
                 System.exit(1);
             }
 
+            // TODO: figure out if we still need this and how we will save the fingerprint
             // fingerprinter
             try {
                 Path fingerprintPath = Paths.get(this.path, ".locker", this.rabinSerName);
@@ -293,7 +326,7 @@ public class Locker implements Serializable {
             fis = new FileInputStream(mapPath.toString());
             ois = new ObjectInputStream(fis);
             // unchecked cast, not sure what else can be done
-            this.chunkMap = (HashMap<FileChunkHash, FileChunk>) ois.readObject();
+            this.chunkMap = (HashMap<String, FileChunk>) ois.readObject();
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
             System.exit(1);
@@ -313,6 +346,7 @@ public class Locker implements Serializable {
         // We defer the file reading from disk to actual operations on those files.
         // This is to save on disk IO bottle necks in case of large lockers.
     }
+
 
     /**
      * Intended to be called after the class is instantiated, this method only
