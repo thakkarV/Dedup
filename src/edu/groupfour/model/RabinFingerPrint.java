@@ -1,11 +1,5 @@
 package edu.groupfour.model;
 
-import sun.plugin2.jvm.CircularByteBuffer;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.nio.file.StandardOpenOption;
-
 import java.util.ArrayList;
 
 public class RabinFingerPrint implements FingerPrint {

@@ -16,16 +16,13 @@ public class Selector extends JPanel {
 
         selectFiles = new JButton("Select Input Files");
 
-        selectFiles.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                fileChooser = new JFileChooser(FileSystemView.getFileSystemView().getHomeDirectory());
-                int returnValue = fileChooser.showOpenDialog(null);
+        selectFiles.addActionListener(e -> {
+            fileChooser = new JFileChooser(FileSystemView.getFileSystemView().getHomeDirectory());
+            int returnValue = fileChooser.showOpenDialog(null);
 
-                if (returnValue == JFileChooser.APPROVE_OPTION) {
-                    File selectedFile = fileChooser.getSelectedFile();
-                    System.out.println(selectedFile.getAbsolutePath());
-                }
+            if (returnValue == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                System.out.println(selectedFile.getAbsolutePath());
             }
         });
 
