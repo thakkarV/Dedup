@@ -11,17 +11,38 @@ public class CLIRunner {
     }
 
     void run() {
+        // init locker
+        if (this.parsedCommands.hasOption("i")) {
+            System.out.println(this.parsedCommands.getOptionValue("i"));
+            Locker locker = new Locker(
+                    this.parsedCommands.getOptionValue("i"),
+                    this.parsedCommands.getOptionValue("n"),
+                    4096
+            );
+        }
+
         // add file
-        if (this.parsedCommands.hasOption("a")) {
-            Locker locker = new Locker(this.parsedCommands.getOptionValue("l"), false);
+        else if (this.parsedCommands.hasOption("a")) {
+            Locker locker = new Locker(
+                    this.parsedCommands.getOptionValue("l")
+            );
             locker.addFile(this.parsedCommands.getOptionValue("a"));
         }
+
         // add directory
         else if (this.parsedCommands.hasOption("A")) {
-            Locker locker = new Locker(this.parsedCommands.getOptionValue("l"), false);
-            locker.addDir(this.parsedCommands.getOptionValue("A"), this.parsedCommands.hasOption("R"));
+            Locker locker = new Locker(
+                    this.parsedCommands.getOptionValue("l")
+            );
+
+            locker.addDir(
+                    this.parsedCommands.getOptionValue("A"),
+                    this.parsedCommands.hasOption("R")
+            );
+
             locker.save();
         }
+
         // retrieve file
         else if (this.parsedCommands.hasOption("r")) {
             if (!this.parsedCommands.hasOption("t")) {
@@ -29,16 +50,22 @@ public class CLIRunner {
                 System.exit(1);
             }
 
-            Locker locker = new Locker(this.parsedCommands.getOptionValue("l"), false);
-            locker.retrieve(this.parsedCommands.getOptionValue("r"), this.parsedCommands.getOptionValue("t"));
+            Locker locker = new Locker(
+                    this.parsedCommands.getOptionValue("l")
+            );
+
+            locker.retrieve(
+                    this.parsedCommands.getOptionValue("r"),
+                    this.parsedCommands.getOptionValue("t")
+            );
         }
-        // init locker
-        else if (this.parsedCommands.hasOption("i")) {
-            Locker locker = new Locker(this.parsedCommands.getOptionValue("l"), true);
-        }
+
         // delete file
         else if (this.parsedCommands.hasOption("d")) {
-            Locker locker = new Locker(this.parsedCommands.getOptionValue("l"), false);
+            Locker locker = new Locker(
+                    this.parsedCommands.getOptionValue("l")
+            );
+
             locker.deleteFile(this.parsedCommands.getOptionValue("d"));
         }
     }

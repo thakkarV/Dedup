@@ -25,28 +25,20 @@ public class Locker {
     /**
      * Loads or creates a new locker at the specified path.
      * @param path - path to where the locker is located or to be created
-     * @param isNewLocker - true if creating a new locker instead of loading it
      */
-    public Locker(String path, boolean isNewLocker) {
+    public Locker(String path) {
         this.path = path;
         this.chunkMap = new HashMap<>();
         this.files = new ArrayList<>();
 		this.mapLock = new ReentrantReadWriteLock();
 		this.fileListLock = new ReentrantReadWriteLock();
 		// rabin will be loaded by the load function since it is locker dependent
-        if(!isNewLocker) {
-            try {
-                this.load();
-                this.isMutated = false;
-            } catch (IOException e) {
-                e.printStackTrace();
-                System.exit(1);
-            }
-        } else {
-            // default chunk size is 4 kibibytes
-            this.chunkSize = 4096;
-            this.isMutated = true;
-            this.init(path);
+        try {
+            this.load();
+            this.isMutated = false;
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(1);
         }
     }
 
@@ -54,29 +46,36 @@ public class Locker {
      * Loads or creates a new locker at the specified path. If creating, sets the
      * rabin finger print's parameters such that chunk sizes approximates equal to the input size.
      * @param path - path to where the locker is located or to be created
-     * @param isNewLocker - true if creating a new locker instead of loading it
      * @param chunkSize - average approximate size of the file chunks in bytes
      */
-    public Locker(String path, boolean isNewLocker, int chunkSize) {
+    public Locker(String path, String lockerName, int chunkSize) {
         this.path = path;
-        this.chunkMap = new HashMap<>();
-        this.files = new ArrayList<>();
+        if (lockerName == null)
+            lockerName = "Locker";
+
+        Path lockerRootPath = Paths.get(this.path, lockerName);
+
+        try {
+            File lockerRootDir = new File(lockerRootPath.toString());
+            if (!lockerRootDir.exists()) {
+                System.err.println("The provided directory name for the locker already exists. Exiting.");
+                System.exit(1);
+            } else {
+                lockerRootDir.mkdir();
+            }
+        } catch (SecurityException e) {
+            System.err.println("Did not have write permission to provided path. Exiting.");
+            System.exit(1);
+        }
+
 		this.mapLock = new ReentrantReadWriteLock();
         this.fileListLock = new ReentrantReadWriteLock();
+
         // rabin will be loaded by the load function since it is locker dependent
-        if(!isNewLocker) {
-            try {
-                this.load();
-                this.isMutated = false;
-            } catch (IOException e) {
-                e.printStackTrace();
-                System.exit(1);
-            }
-        } else {
-            this.chunkSize = chunkSize;
-            this.isMutated = true;
-            this.init(path);
-        }
+        this.isMutated = true;
+        this.chunkSize = chunkSize;
+        this.initialize(path, lockerName);
+        this.save();
     }
 
 
@@ -86,11 +85,11 @@ public class Locker {
      * Then initializes the fingerprinter and saves its parameters to the .locker folder.
      * @param path - path to where the locker folder will be created
      */
-    public void init(String path) {
+    public void initialize(String path, String lockerName) {
         // TODO : folder name of the locker could be made changeable for the user to customize
-        Path lockerRootPath = Paths.get(path, "Locker");
+        Path lockerRootPath = Paths.get(path, lockerName);
         if (Files.exists(lockerRootPath, LinkOption.NOFOLLOW_LINKS)) {
-            System.err.println("Folder " + "Locker" + " already exists at specified path.");
+            System.err.println("Folder " + lockerName + " already exists at specified path.");
             System.exit(1);
         }
 
@@ -118,10 +117,8 @@ public class Locker {
             e.printStackTrace();
             System.exit(1);
         }
-
-        this.save();
-
     }
+
 
     /**
      * Adds a single file to the locker.
@@ -326,14 +323,17 @@ public class Locker {
         if (this.isMutated) {
             try {
                 Path mapPath = Paths.get(this.path, ".locker" , this.chunkMapSerName);
+                System.out.println(mapPath);
                 fos = new FileOutputStream(mapPath.toFile(), false);
                 oos = new ObjectOutputStream(fos);
                 oos.writeObject(this.chunkMap);
                 oos.writeInt(this.chunkSize);
                 oos.close();
                 fos.close();
-            } catch (IOException e) {
-                System.err.println("Error while saving the locker.");
+            } catch (FileNotFoundException e) {
+                System.err.println("Error while saving the locker. Could not find specified path.");
+                System.exit(1);
+            } catch (Exception e) {
                 e.printStackTrace();
                 System.exit(1);
             }

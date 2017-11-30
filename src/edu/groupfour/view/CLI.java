@@ -24,8 +24,9 @@ import org.apache.commons.cli.*;
 
          // these are dependent on the previous mutually exclusive operations
          Option locker = new Option("l", "locker", true, "Path to an existing locker.");
+         Option lockerName = new Option("n", "name", true, "Name of the root directory of the locker.");
          Option target = new Option("t", "target", false, "Path to where the file retrieved should go.");
-         Option recursiveAdd = new Option("-R", "Recursive", false, "True if recursively adding all child directories");
+         Option recursiveAdd = new Option("R", "Recursive", false, "True if recursively adding all child directories");
 
          OptionGroup operations = new OptionGroup();
          operations.addOption(help)
@@ -41,6 +42,7 @@ import org.apache.commons.cli.*;
          this.options.addOption(locker);
          this.options.addOption(target);
          this.options.addOption(recursiveAdd);
+         this.options.addOption(lockerName);
      }
 
     public CommandLine parse() {
@@ -49,11 +51,6 @@ import org.apache.commons.cli.*;
 
         try {
             cmdline = parser.parse(this.options, this.args);
-
-            if (cmdline.hasOption("h")) {
-                showHelp();
-                System.exit(0);
-            }
         } catch (ParseException e) {
             // log.log(Level.SEVERE, "Failed to parse command line arguments.");
             showHelp();
