@@ -1,7 +1,6 @@
 package edu.groupfour.model;
 
 import java.io.*;
-import java.lang.reflect.Array;
 import java.nio.file.*;
 
 import java.security.MessageDigest;
@@ -32,9 +31,9 @@ public class Locker {
      */
     public Locker(String path) {
         this.path = path;
-        this.files = null;
+        this.files = new ArrayList<>();
         this.dirFiles = null;
-        this.chunkMap = null;
+        this.chunkMap = new HashMap<>();
         this.mapLock = new ReentrantReadWriteLock();
 		this.dirFileListLock = new ReentrantReadWriteLock();
         this.load();
@@ -55,7 +54,7 @@ public class Locker {
         this.path = Paths.get(path, lockerName).toString();
         this.files = null;
         this.dirFiles = null;
-        this.chunkMap = null;
+        this.chunkMap = new HashMap<>();
 		this.mapLock = new ReentrantReadWriteLock();
         this.dirFileListLock = new ReentrantReadWriteLock();
 
@@ -83,7 +82,7 @@ public class Locker {
             } else {
                 if (!lockerRootDir.mkdir()) {
                     System.err.println("Could not create new directory at provided path. Exiting.");
-                    System.exit(1);
+//                    System.exit(1);
                 }
             }
         } catch (SecurityException e) {
@@ -94,8 +93,12 @@ public class Locker {
         // Holds the serialized Locker Object's chunkMap and metadata about the chunkSize
         Path lockerlockerPath = Paths.get(path, ".locker");
         try {
-            Files.createDirectory(lockerlockerPath);
-        } catch (IOException e) {
+            File lockerlockerDir = new File(lockerlockerPath.toString());
+            if (!lockerlockerDir.mkdir()) {
+                System.err.println("Could not create new directory at provided path. Exiting.");
+//                    System.exit(1);
+            }
+        } catch (SecurityException e) {
             e.printStackTrace();
             System.exit(1);
         }
@@ -103,8 +106,12 @@ public class Locker {
         // holds the serialized LockerFile objects from Locker's ArrayList of LockerFiles
         Path lockerFilePath = Paths.get(path, ".files");
         try {
-            Files.createDirectory(lockerFilePath);
-        } catch (IOException e) {
+            File lockerFileDir = new File(lockerFilePath.toString());
+            if (!lockerFileDir.mkdir()) {
+                System.err.println("Could not create new directory at provided path. Exiting.");
+//                    System.exit(1);
+            }
+        } catch (SecurityException e) {
             e.printStackTrace();
             System.exit(1);
         }
@@ -177,7 +184,6 @@ public class Locker {
 
             lockerFileHashes.add(chunkHash);
             previous = currentBound;
-            System.out.println("Added Chunk");
         }
 
         // now insert this new locker file into the array list of locker files
@@ -281,6 +287,18 @@ public class Locker {
 
         if (this.dirName != null) {
             Path outDirPath = Paths.get(targetPathStr, this.dirName);
+            // create the dir first before writing files
+            File dir = new File(outDirPath.toString());
+            try {
+                if (!dir.mkdir()) {
+                    System.err.println("Could not create new directory in locker.");
+                    System.exit(1);
+                }
+            } catch (SecurityException e) {
+                System.err.println("Did not have write permission to locker. Exiting");
+                System.exit(1);
+            }
+
             ArrayList<Thread> threads = new ArrayList<>();
             for (LockerFile lfile : this.dirFiles) {
                 Thread T = new Thread (() -> this.retrieveFileWrite(outDirPath.toString(), lfile));
@@ -647,9 +665,10 @@ public class Locker {
                 System.exit(1);
             }
 
+            ArrayList<Thread> threads = new ArrayList<>();
             for (File f : dirList) {
                 // spawn up a new thread for each file to be loaded
-                new Thread(()-> {
+                Thread T = new Thread(()-> {
                     FileInputStream fis;
                     ObjectInputStream ois;
                     try {
@@ -667,7 +686,35 @@ public class Locker {
                         System.exit(1);
                     }
                 });
+                T.start();
+                threads.add(T);
             }
+
+            for (Thread T : threads) {
+                try {
+                    T.join();
+                } catch (InterruptedException e) {
+                    System.err.println("Thread interrupted.");
+                }
+            }
+        }
+    }
+
+    /**
+     * Helper for the GUI which returns all the files in the Locker right now
+     * without actually deserialzing and loading them into the Locker class.
+     * @return ArrayList of Files that are in the locker.
+     */
+    public ArrayList<File> getLockerContents() {
+        Path lockerFilePath = Paths.get(this.path, ".files");
+        File lockerFileRoot = new File(lockerFilePath.toString());
+        File [] files = lockerFileRoot.listFiles();
+        ArrayList<File> retList = new ArrayList<>();
+        if (files != null) {
+            Collections.addAll(retList, files);
+            return retList;
+        } else {
+            return null;
         }
     }
 }
