@@ -1,6 +1,7 @@
 package edu.groupfour.model;
 
 import java.io.*;
+import java.lang.reflect.Array;
 import java.nio.file.*;
 
 import java.security.MessageDigest;
@@ -13,6 +14,8 @@ public class Locker {
     transient private final String chunkMapSerName = "ChunkMap.ser";
 
     private ArrayList<LockerFile> files; // paths of the files that are to be added to the locker
+    private ArrayList<LockerFile> dirFiles;
+    private String dirName;
     private HashMap<String, FileChunk> chunkMap; // maps the hashes of chunks to the chunks of the files
     private int chunkSize;
 
@@ -20,7 +23,7 @@ public class Locker {
     transient private String path; // path to locker
     transient private boolean isMutated; // true if the chunk map was changed since loading the last state
     transient private ReentrantReadWriteLock mapLock;
-    transient private ReentrantReadWriteLock fileListLock;
+    transient private ReentrantReadWriteLock dirFileListLock;
 
 
     /**
@@ -29,10 +32,11 @@ public class Locker {
      */
     public Locker(String path) {
         this.path = path;
-        this.chunkMap = new HashMap<>();
-        this.files = new ArrayList<>();
-		this.mapLock = new ReentrantReadWriteLock();
-		this.fileListLock = new ReentrantReadWriteLock();
+        this.files = null;
+        this.dirFiles = null;
+        this.chunkMap = null;
+        this.mapLock = new ReentrantReadWriteLock();
+		this.dirFileListLock = new ReentrantReadWriteLock();
         this.load();
         this.isMutated = false;
     }
@@ -49,10 +53,11 @@ public class Locker {
             lockerName = "Locker";
 
         this.path = Paths.get(path, lockerName).toString();
-        this.files = new ArrayList<>();
-        this.chunkMap = new HashMap<>();
+        this.files = null;
+        this.dirFiles = null;
+        this.chunkMap = null;
 		this.mapLock = new ReentrantReadWriteLock();
-        this.fileListLock = new ReentrantReadWriteLock();
+        this.dirFileListLock = new ReentrantReadWriteLock();
 
         // rabin will be loaded by the load function since it is locker dependent
         this.isMutated = true;
@@ -110,7 +115,7 @@ public class Locker {
      * Adds a single file to the locker.
      * @param filePath - Path to the file to be added to the locker.
      */
-    public void addFile(String filePath) {
+    public void addFile(String filePath, boolean isDir) {
         File originFile = new File(filePath);
 
         // check if a file by this name is already in the locker
@@ -177,12 +182,16 @@ public class Locker {
 
         // now insert this new locker file into the array list of locker files
         LockerFile lfile = new LockerFile(originFile.getName(), lockerFileHashes);
-        this.fileListLock.writeLock().lock();
-            this.files.add(lfile);
-        this.fileListLock.writeLock().unlock();
-        this.isMutated = true;
 
-        System.out.println("Added File");
+        if (isDir) {
+            this.dirFileListLock.writeLock().lock();
+                this.dirFiles.add(lfile);
+            this.dirFileListLock.writeLock().unlock();
+        } else {
+            this.files.add(lfile);
+        }
+
+        this.isMutated = true;
     }
 
     
@@ -192,8 +201,10 @@ public class Locker {
      * @param recursiveAdd - If true, adds all subdirectories recursively to the locker.
      */
     public void addDir(String dirPath, boolean recursiveAdd) {
+        this.dirFiles = new ArrayList<>();
         this.isMutated = true;
         File dir  = new File(dirPath);
+        this.dirName = dir.getName();
         if (!dir.isDirectory()) {
             System.err.println("Input path does not point to a directory.");
             System.exit(1);
@@ -209,8 +220,19 @@ public class Locker {
             }
 
             for (File f : dirListing) {
+                ArrayList<Thread> threads = new ArrayList<>();
                 if (f.isFile()) {
-                    new Thread(() -> addFile(f.toString())).start();
+                    Thread T = new Thread(() -> addFile(f.toString(), true));
+                    T.start();
+                    threads.add(T);
+                }
+
+                for (Thread T : threads) {
+                    try {
+                        T.join();
+                    } catch (InterruptedException e) {
+                        System.err.println("Thread interrupted.");
+                    }
                 }
             }
         } else {
@@ -221,10 +243,23 @@ public class Locker {
             }
             
             for (File f : dirListing) {
-				if (f.isFile())
-					new Thread(() -> addFile(f.toString())).start();
+                ArrayList<Thread> threads = new ArrayList<>();
+				if (f.isFile()) {
+                    Thread T = new Thread(() -> addFile(f.toString(), true));
+                    T.start();
+                    threads.add(T);
+                }
+
 				else if (f.isDirectory())
 					this.addDir(f.getPath(), true);
+
+				for (Thread T : threads) {
+				    try {
+                        T.join();
+                    } catch (InterruptedException e) {
+				        System.err.println("Thread interrupted");
+                    }
+                }
 			}
         }
     }
@@ -232,22 +267,61 @@ public class Locker {
 
     /**
      * Reconstructs a file or directory that was added to the locker, and writes to the desired location.
-     * @param localFilePath - Local path of the file or directory to be reconstructed, starting at the Locker's root.
+     * @param entryName - Local path of the file or directory to be reconstructed, starting at the Locker's root.
      * @param targetPathStr - Path to which the reconstructed file or folder is to be written.
      */
-    public void retrieve(String localFilePath, String targetPathStr) {
+    public void retrieve(String entryName, String targetPathStr) {
         // check if input is valid
         try {
-            this.deferredFileLoader(localFilePath);
+            this.deferredFileLoader(entryName);
         } catch (NoSuchFileException e) {
             System.err.println("Input file name does not exist in the locker.");
             return;
         }
 
+        if (this.dirName != null) {
+            Path outDirPath = Paths.get(targetPathStr, this.dirName);
+            ArrayList<Thread> threads = new ArrayList<>();
+            for (LockerFile lfile : this.dirFiles) {
+                Thread T = new Thread (() -> this.retrieveFileWrite(outDirPath.toString(), lfile));
+                T.start();
+                threads.add(T);
+            }
+
+            for(Thread T : threads) {
+                try {
+                    T.join();
+                } catch (InterruptedException e) {
+                    System.err.println("Thread interrupted.");
+                }
+            }
+
+            this.dirName = null;
+            this.dirFiles = null;
+        }
+        else {
+            // first load in the file into the LockerFile array
+            LockerFile lfile = null;
+            for (LockerFile f : this.files) {
+                if (f.entryName.equals(entryName))
+                    lfile = f;
+            }
+
+            if (lfile == null) {
+                System.err.println("Could not find file to be deleted in the locker.");
+                return;
+            }
+
+            this.retrieveFileWrite(targetPathStr, lfile);
+        }
+    }
+
+    private void retrieveFileWrite(String targetPathStr, LockerFile lfile) {
         // read in the chunks and concatenate
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         FileChunk chunk;
-        LockerFile lfile = this.files.get(0);
+
+        // now deserialize it
         for (String hash : lfile.chunkHashes) {
             chunk = this.chunkMap.get(hash);
             try {
@@ -260,7 +334,7 @@ public class Locker {
 
         // try writing to output path
         try {
-            Path outputPath = Paths.get(targetPathStr, lfile.localFilePath);
+            Path outputPath = Paths.get(targetPathStr, lfile.entryName);
             File f = new File(outputPath.toString());
             FileOutputStream fos = new FileOutputStream(f);
             baos.writeTo(fos);
@@ -282,33 +356,103 @@ public class Locker {
     /**
      * Deletes a given files from the locker. Here the input path is the path of the
      * file that was provided when the file was first inserted into the locker.
-     * @param localFilePath - The path of the file to be deleted from when it was first inserted into the locker.
+     * @param entryName - The path of the file to be deleted from when it was first inserted into the locker.
      */
-    public void deleteFile(String localFilePath) {
+    public void delete(String entryName) {
         try {
-            this.deferredFileLoader(localFilePath);
+            this.deferredFileLoader(entryName);
         } catch (NoSuchFileException e) {
             System.err.println("Input file does not exist in the locker.");
             return;
         }
 
+        if (this.dirName != null) {
+            Path dirPath = Paths.get(this.path, ".files", this.dirName + ".ser");
+            File dir = dirPath.toFile();
+            File [] dirList = dir.listFiles();
+            if (dirList == null) {
+                System.err.println("Error deleting directory from locker. Exiting.");
+                System.exit(1);
+            }
+
+            ArrayList<Thread> threads = new ArrayList<>();
+            for (File f : dirList) {
+                Thread T = new Thread (() -> this.deleteFileInDir(f.toString()));
+                T.start();
+                threads.add(T);
+            }
+
+            for(Thread T : threads) {
+                try {
+                    T.join();
+                } catch (InterruptedException e) {
+                    System.err.println("Thread interrupted.");
+                }
+            }
+
+            this.dirName = null;
+            this.dirFiles = null;
+        } else {
+            File target = new File(Paths.get(this.path, ".files", entryName + ".ser").toString());
+
+            // first load in the file into the LockerFile array
+            LockerFile targetFile = null;
+            for (LockerFile f : this.files) {
+                if (f.entryName.equals(entryName))
+                    targetFile = f;
+            }
+
+            if (targetFile == null) {
+                System.err.println("Could not find file to be deleted in the locker.");
+                return;
+            }
+
+            // now first delete the serialized LockerFile from disk
+            // if we cannot do this, then we cannot remove the references to these chunks in the main chunkMap
+            try {
+                if (!target.delete()) {
+                    System.err.println("Could not delete file on disk.");
+                    System.exit(1);
+                }
+            } catch (SecurityException e) {
+                System.err.println("Did not have permission to delete file on disk. Exiting.");
+                System.exit(1);
+            }
+
+            // decrement chunk references from the chunk map. Delete if references are zero.
+            for (String hash : targetFile.chunkHashes) {
+                FileChunk chunk = this.chunkMap.get(hash);
+                chunk.deleteReference();
+                if (chunk.isDeletable()) {
+                    this.chunkMap.remove(hash);
+                }
+            }
+
+            // remove the file entry in the files array list
+            this.files.remove(targetFile);
+        }
+    }
+
+    private void deleteFileInDir(String filePath) {
+        File targetOnDisk = new File(filePath);
+
         // first load in the file into the LockerFile array
-        LockerFile targetFile = null;
-        for (LockerFile f : this.files) {
-            if (f.localFilePath.equals(localFilePath))
-                targetFile = f;
+        LockerFile targetInLocker = null;
+        for (LockerFile f : this.dirFiles) {
+            String fileName = f.entryName + ".ser";
+            if (fileName.equals(targetOnDisk.getName()))
+                targetInLocker = f;
         }
 
-        if (targetFile == null) {
+        if (targetInLocker == null) {
             System.err.println("Could not find file to be deleted in the locker.");
             return;
         }
 
         // now first delete the serialized LockerFile from disk
         // if we cannot do this, then we cannot remove the references to these chunks in the main chunkMap
-        File target = new File(Paths.get(this.path, ".files", localFilePath + ".ser").toString());
         try {
-            if (!target.delete()) {
+            if (!targetOnDisk.delete()) {
                 System.err.println("Could not delete file on disk.");
                 System.exit(1);
             }
@@ -318,16 +462,23 @@ public class Locker {
         }
 
         // decrement chunk references from the chunk map. Delete if references are zero.
-        for (String hash : targetFile.chunkHashes) {
-            FileChunk chunk = this.chunkMap.get(hash);
+        for (String hash : targetInLocker.chunkHashes) {
+            this.mapLock.readLock().lock();
+                FileChunk chunk = this.chunkMap.get(hash);
+            this.mapLock.readLock().unlock();
+
+            this.mapLock.writeLock().lock();
             chunk.deleteReference();
             if (chunk.isDeletable()) {
                 this.chunkMap.remove(hash);
             }
+            this.mapLock.writeLock().unlock();
         }
 
-        // remove the file entry in the files array list
-        this.files.remove(targetFile);
+        // remove the file entry in the dirFiles array list
+        this.dirFileListLock.writeLock().lock();
+            this.dirFiles.remove(targetInLocker);
+        this.dirFileListLock.writeLock().unlock();
     }
 
 
@@ -358,26 +509,64 @@ public class Locker {
             }
         }
 
-        // now all files if they were mutated
-        if (this.files.isEmpty())
-            return;
-        
-        for (LockerFile f : this.files) {
-            if (f.isMutated) {
-                try {
-                    Path filePath = Paths.get(this.path, ".files", f.localFilePath + ".ser");
-                    fos = new FileOutputStream(filePath.toString(), false);
-                    oos = new ObjectOutputStream(fos);
-                    oos.writeObject(f);
-                    oos.close();
-                    fos.close();
-                } catch (IOException e) {
-                    System.err.println("Error while saving the locker.");
-                    e.printStackTrace();
-                    System.exit(1);
+        // save all file changed since the last save
+        if (this.files != null && !this.files.isEmpty()) {
+            for (LockerFile f : this.files) {
+                if (f.isMutated) {
+                    try {
+                        Path filePath = Paths.get(this.path, ".files", f.entryName + ".ser");
+                        fos = new FileOutputStream(filePath.toString(), false);
+                        oos = new ObjectOutputStream(fos);
+                        oos.writeObject(f);
+                        oos.close();
+                        fos.close();
+                    } catch (IOException e) {
+                        System.err.println("Error while saving the locker.");
+                        e.printStackTrace();
+                        System.exit(1);
+                    }
                 }
             }
+            this.files.clear();
         }
+
+        // save dir as a single entity if that's what was added to the locker
+        if (this.dirFiles != null && !this.dirFiles.isEmpty()) {
+            Path dirPath = Paths.get(this.path, ".files", this.dirName + ".ser");
+            File dir = new  File(dirPath.toString());
+
+            // first create dir in .files dir of locker
+            try {
+                if (!dir.mkdir()) {
+                    System.err.println("Could not create new directory in locker.");
+                    System.exit(1);
+                }
+            } catch (SecurityException e) {
+                System.err.println("Did not have write permission to locker. Exiting");
+                System.exit(1);
+            }
+
+            // now write all the files into it
+            for (LockerFile f : this.dirFiles) {
+                if (f.isMutated) {
+                    try {
+                        Path filePath = Paths.get(dir.getPath(), f.entryName + ".ser");
+                        fos = new FileOutputStream(filePath.toString(), false);
+                        oos = new ObjectOutputStream(fos);
+                        oos.writeObject(f);
+                        oos.close();
+                        fos.close();
+                    } catch (IOException e) {
+                        System.err.println("Error while saving the locker.");
+                        e.printStackTrace();
+                        System.exit(1);
+                    }
+                }
+            }
+            this.dirFiles.clear();
+        }
+
+        this.isMutated = false;
     }
 
     
@@ -417,27 +606,68 @@ public class Locker {
      * loads in a single file from the disk and deserializes it, either to make modifications to the file,
      * or to overwrite it or to retrieve it. This allows us to not load all the deserialized LockerFile classes
      * every time we load in a locker that already exists. Removed disk IO as a major bottleneck.
-     * @param localPath - path to the file to be loaded
+     * @param entryName - path to the file to be loaded
      * @throws NoSuchFileException - if the serialized object cannot be read.
      */
-    private void deferredFileLoader(String localPath) throws NoSuchFileException {
-        Path filePath = Paths.get(this.path, ".files", localPath + ".ser");
-        if (!filePath.toFile().exists())
-            throw new NoSuchFileException("File " + localPath + " not found in locker.");
+    private void deferredFileLoader(String entryName) throws NoSuchFileException {
+        Path filePath = Paths.get(this.path, ".files", entryName + ".ser");
+        File loadFile = new File(filePath.toString());
 
-        FileInputStream fis;
-        ObjectInputStream ois;
-        try {
-            fis = new FileInputStream(filePath.toString());
-            ois = new ObjectInputStream(fis);
-            LockerFile file = (LockerFile) ois.readObject();
-            this.files.add(file);
-            ois.close();
-            fis.close();
-        } catch (IOException | ClassNotFoundException e) {
-            System.err.println("Error while loading the locker file.");
-            e.printStackTrace();
-            System.exit(1);
+        if (!loadFile.exists())
+            throw new NoSuchFileException("File " + entryName + " not found in locker.");
+
+        // load a single file
+        if (loadFile.isFile()) {
+            this.files = new ArrayList<>();
+            FileInputStream fis;
+            ObjectInputStream ois;
+            try {
+                fis = new FileInputStream(filePath.toString());
+                ois = new ObjectInputStream(fis);
+                LockerFile file = (LockerFile) ois.readObject();
+                this.files.add(file);
+                ois.close();
+                fis.close();
+            } catch (IOException | ClassNotFoundException e) {
+                System.err.println("Error while loading the locker file.");
+                e.printStackTrace();
+                System.exit(1);
+            }
+        }
+
+        // load a directory as a single entity
+        else if (loadFile.isDirectory()) {
+            // init stuff needed to load a dir
+            this.dirName = entryName;
+            this.dirFiles = new ArrayList<>();
+
+            File [] dirList = loadFile.listFiles();
+            if (dirList == null || dirList.length == 0) {
+                System.err.println("Directory to be loaded was empty. Exiting.");
+                System.exit(1);
+            }
+
+            for (File f : dirList) {
+                // spawn up a new thread for each file to be loaded
+                new Thread(()-> {
+                    FileInputStream fis;
+                    ObjectInputStream ois;
+                    try {
+                        fis = new FileInputStream(f);
+                        ois = new ObjectInputStream(fis);
+                        LockerFile file = (LockerFile) ois.readObject();
+                        this.dirFileListLock.writeLock().lock();
+                            this.dirFiles.add(file);
+                        this.dirFileListLock.writeLock().unlock();
+                        ois.close();
+                        fis.close();
+                    } catch (IOException | ClassNotFoundException e) {
+                        System.err.println("Error while loading the locker file.");
+                        e.printStackTrace();
+                        System.exit(1);
+                    }
+                });
+            }
         }
     }
 }

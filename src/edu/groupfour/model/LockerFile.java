@@ -4,7 +4,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 
 class LockerFile implements Serializable {
-    String localFilePath;
+    String entryName;
     ArrayList<String> chunkHashes;
     boolean isMutated;
 
@@ -12,14 +12,14 @@ class LockerFile implements Serializable {
         this.chunkHashes = new ArrayList<>();
     }
 
-    LockerFile(String localFilePath) {
-        this.localFilePath = localFilePath;
+    LockerFile(String entryName) {
+        this.entryName = entryName;
         this.chunkHashes = new ArrayList<>();
         this.isMutated = true;
     }
 
-    LockerFile(String localFilePath, ArrayList<String> hashes) {
-        this.localFilePath = localFilePath;
+    LockerFile(String entryName, ArrayList<String> hashes) {
+        this.entryName = entryName;
         this.chunkHashes = hashes;
         this.isMutated = true;
     }
