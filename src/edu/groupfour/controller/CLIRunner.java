@@ -13,7 +13,6 @@ public class CLIRunner {
     void run() {
         // init locker
         if (this.parsedCommands.hasOption("i")) {
-            System.out.println(this.parsedCommands.getOptionValue("i"));
             Locker locker = new Locker(
                     this.parsedCommands.getOptionValue("i"),
                     this.parsedCommands.getOptionValue("n"),

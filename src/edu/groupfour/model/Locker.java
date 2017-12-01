@@ -32,14 +32,8 @@ public class Locker {
         this.files = new ArrayList<>();
 		this.mapLock = new ReentrantReadWriteLock();
 		this.fileListLock = new ReentrantReadWriteLock();
-		// rabin will be loaded by the load function since it is locker dependent
-        try {
-            this.load();
-            this.isMutated = false;
-        } catch (IOException e) {
-            e.printStackTrace();
-            System.exit(1);
-        }
+        this.load();
+        this.isMutated = false;
     }
 
     /**
@@ -49,32 +43,19 @@ public class Locker {
      * @param chunkSize - average approximate size of the file chunks in bytes
      */
     public Locker(String path, String lockerName, int chunkSize) {
-        this.path = path;
         if (lockerName == null)
             lockerName = "Locker";
-
-        Path lockerRootPath = Paths.get(this.path, lockerName);
-
-        try {
-            File lockerRootDir = new File(lockerRootPath.toString());
-            if (!lockerRootDir.exists()) {
-                System.err.println("The provided directory name for the locker already exists. Exiting.");
-                System.exit(1);
-            } else {
-                lockerRootDir.mkdir();
-            }
-        } catch (SecurityException e) {
-            System.err.println("Did not have write permission to provided path. Exiting.");
-            System.exit(1);
-        }
-
+        
+        this.path = Paths.get(path, lockerName).toString();
+        this.files = new ArrayList<>();
+        this.chunkMap = new HashMap<>();
 		this.mapLock = new ReentrantReadWriteLock();
         this.fileListLock = new ReentrantReadWriteLock();
 
         // rabin will be loaded by the load function since it is locker dependent
         this.isMutated = true;
         this.chunkSize = chunkSize;
-        this.initialize(path, lockerName);
+        this.initialize(this.path);
         this.save();
     }
 
@@ -85,23 +66,26 @@ public class Locker {
      * Then initializes the fingerprinter and saves its parameters to the .locker folder.
      * @param path - path to where the locker folder will be created
      */
-    public void initialize(String path, String lockerName) {
-        // TODO : folder name of the locker could be made changeable for the user to customize
-        Path lockerRootPath = Paths.get(path, lockerName);
-        if (Files.exists(lockerRootPath, LinkOption.NOFOLLOW_LINKS)) {
-            System.err.println("Folder " + lockerName + " already exists at specified path.");
-            System.exit(1);
-        }
-
+    private void initialize(String path) {
+        // create root directory of the locker
         try {
-            Files.createDirectory(lockerRootPath);
-        } catch (IOException e) {
-            e.printStackTrace();
+            File lockerRootDir = new File(path);
+            if (lockerRootDir.exists()) {
+                System.err.println("The provided directory name for the locker already exists. Exiting.");
+                System.exit(1);
+            } else {
+                if (!lockerRootDir.mkdir()) {
+                    System.err.println("Could not create new directory at provided path. Exiting.");
+                    System.exit(1);
+                }
+            }
+        } catch (SecurityException e) {
+            System.err.println("Did not have write permission to provided path. Exiting.");
             System.exit(1);
         }
-
-        // Holds the serialized Locker Object's chunkMap and metadata about the fingerprinter
-        Path lockerlockerPath = Paths.get(lockerRootPath.toString(), ".locker");
+        
+        // Holds the serialized Locker Object's chunkMap and metadata about the chunkSize
+        Path lockerlockerPath = Paths.get(path, ".locker");
         try {
             Files.createDirectory(lockerlockerPath);
         } catch (IOException e) {
@@ -109,8 +93,8 @@ public class Locker {
             System.exit(1);
         }
 
-        // holds the serialized LockerFile objects from Locker's ArrayList of LockerFile
-        Path lockerFilePath = Paths.get(lockerRootPath.toString(), ".files");
+        // holds the serialized LockerFile objects from Locker's ArrayList of LockerFiles
+        Path lockerFilePath = Paths.get(path, ".files");
         try {
             Files.createDirectory(lockerFilePath);
         } catch (IOException e) {
@@ -126,11 +110,11 @@ public class Locker {
      */
     public void addFile(String filePath) {
         this.isMutated = true;
-
+        File originFile = new File(filePath);
         // first read the file as a large string
         byte [] fileBytes;
         try {
-            fileBytes = new Scanner(new File(filePath)).useDelimiter("\\Z").next().getBytes();
+            fileBytes = new Scanner(originFile).useDelimiter("\\Z").next().getBytes();
         } catch (IOException e) {
             e.printStackTrace();
             return;
@@ -179,12 +163,13 @@ public class Locker {
         }
 
         // now insert this new locker file into the array list of locker files
-        LockerFile lfile = new LockerFile(filePath, lockerFileHashes);
+        LockerFile lfile = new LockerFile(originFile.getName(), lockerFileHashes);
         this.fileListLock.writeLock().lock();
             this.files.add(lfile);
         this.fileListLock.writeLock().unlock();
     }
 
+    
     /**
      * Adds an entire directory's content to the locker.
      * @param dirPath - Path to the directory whose contents are being added to the locker.
@@ -239,7 +224,7 @@ public class Locker {
         try {
             this.deferredFileLoader(localFilePath);
         } catch (NoSuchFileException e) {
-            System.err.println("Input file name does not exist in the locker. Please try again.");
+            System.err.println("Input file name does not exist in the locker.");
             return;
         }
 
@@ -270,15 +255,21 @@ public class Locker {
             e.printStackTrace();
             System.exit(1);
         } catch (InvalidPathException e) {
-            System.err.println("Provided path is invalid. Please try again.");
+            System.err.println("Provided output path is invalid.");
+            System.exit(1);
         }
     }
-
+    
+    /**
+     * Deletes a given files from the locker. Here the input path is the path of the
+     * file that was provided when the file was first inserted into the locker.
+     * @param localFilePath - The path of the file to be deleted from when it was first inserted into the locker.
+     */
     public void deleteFile(String localFilePath) {
         try {
             this.deferredFileLoader(localFilePath);
         } catch (NoSuchFileException e) {
-            System.err.println("No such file exists in the locker.");
+            System.err.println("Input file does not exist in the locker.");
             return;
         }
 
@@ -323,7 +314,6 @@ public class Locker {
         if (this.isMutated) {
             try {
                 Path mapPath = Paths.get(this.path, ".locker" , this.chunkMapSerName);
-                System.out.println(mapPath);
                 fos = new FileOutputStream(mapPath.toFile(), false);
                 oos = new ObjectOutputStream(fos);
                 oos.writeObject(this.chunkMap);
@@ -332,14 +322,18 @@ public class Locker {
                 fos.close();
             } catch (FileNotFoundException e) {
                 System.err.println("Error while saving the locker. Could not find specified path.");
+                e.printStackTrace();
                 System.exit(1);
-            } catch (Exception e) {
+            } catch (IOException e) {
                 e.printStackTrace();
                 System.exit(1);
             }
         }
 
         // now all files if they were mutated
+        if (this.files.isEmpty())
+            return;
+        
         for (LockerFile f : this.files) {
             if (f.isMutated) {
                 try {
@@ -358,12 +352,12 @@ public class Locker {
         }
     }
 
+    
     /**
      * Implements the de-serialization to load the locker object from disk.
-     * @throws IOException - if the object cannot be loaded
      */
     @SuppressWarnings("unchecked")
-    private void load() throws IOException {
+    private void load() {
         // set everything's isMutated to flase when loading
         // chunk map and finger printer are reloaded every time
         FileInputStream fis;
@@ -396,9 +390,9 @@ public class Locker {
      * or to overwrite it or to retrieve it. This allows us to not load all the deserialized LockerFile classes
      * every time we load in a locker that already exists. Removed disk IO as a major bottleneck.
      * @param localPath - path to the file to be loaded
-     * @throws IOException - if the serialized object cannot be read.
+     * @throws NoSuchFileException - if the serialized object cannot be read.
      */
-    private void deferredFileLoader(String localPath) throws NoSuchFileException{
+    private void deferredFileLoader(String localPath) throws NoSuchFileException {
         Path filePath = Paths.get(this.path, localPath + ".ser");
         if (!filePath.toFile().exists())
             throw new NoSuchFileException("File " + localPath + " not found in locker.");
