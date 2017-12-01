@@ -1,0 +1,59 @@
+===================================
+Pre-Conditions
+===================================
+Hardware: 
+The desktop application will work on any operating system where the JVM is installed. It should be noted that the code base has only been tested on windows and Linux however.
+Software:
+The locker CLI version depends on one external Open source library: Apache Commonds CLI 1.4. It is used as a tool to parse the command line arguments, as parsing is not the goal of this project.
+Download: https://commons.apache.org/proper/commons-cli/download_cli.cgi
+To build and run the locker, clone the repository for the CLI branch, open with IntelliJ Idea. The defauly intelliJ build system is used with the following parameters:
+Set the project SDK to JDK version to 1.9
+Java language level is 9
+Under Project Structure -> Modules -> Add Module, add the CLI library’s root folder as a new module for the project
+Build and run with command line arguments
+
+===================================
+Usage
+===================================
+The following are the commands that are supported by the CLI locker, which can  be obtained using the -h flag in the command line args.
+usage: Main
+ -a,--addFile <arg>   Path to the file to be added to the locker.
+ -A,--addDir <arg>    Path to the directory to be added to the locker.
+ -d,--delete <arg>    Name of the file to be deleted from the locker.
+ -h,--help            Show help.
+ -i,--init <arg>      Initialize a new locker at the input path.
+ -l,--locker <arg>    Path to an existing locker.
+ -n,--name <arg>      Name of the root directory of the locker.
+ -r,--retrieve <arg>  Local path of the file to be retrieved.
+ -R,--Recursive       True if recursively adding all child directories
+ -t,--target <arg>    Path to where the file retrieved should go.
+
+Here “a”, “A”, “d”, “h”, “i”, “r” are mutually exclusive arguments, in that passing more than one will display help and exit. One of them is required as well for the locker to work, as these are distinct operations on the locker.
+
+Before using a locker, it must be initialized at a location on disk using the -i command. This locker will be given  a default locker name “Locker” is none is provided using -n flag.Then any of the operations listed above can be called on that locker by passing the path of the locker with the -l flag and the other appropriate arguments for the operation.
+The locker only supports adding of ASCII text files and guarantees deduplication on them.  These can be added to the locker in three ways. Adding a simple files with -a. Adding all contents of a directory with -A and recursive adding of a directory with -A alsong with a flag -R. 
+
+Added files or directories can be deleted using the -d flag. The argument of this command is the name of the file or the folder to be deleted.
+
+Files or directories can be retrieved from the locker using the -r command, whose arg is the name of the file or directory to be retrieved. This also required a -t arg which is the path to where the output will be saved.
+
+NOTE: 
+For using the GUI, please switch and pull code from the "gui" branch of the bitcuker repo, as that branch holds the build for the GUI MVS for the project. Master branch is the CLI MVC, gui is the graphical MVC.
+
+Example commands:
+INIT
+-i  C:\Users\ShyamRath\Desktop\ -n TestLocker
+
+ADD
+-l C:\Users\ShyamRath\Desktop\TestLocker -a
+
+ADD DIR 
+-l C:\Users\ShyamRath\Desktop\TestLocker -A C:\Users\ShyamRath\Desktop\test50
+
+RETRIEVE
+-l C:\Users\ShyamRath\Desktop\TestLocker -r test_long_copy.txt -t  C:\Users\ShyamRath\Desktop
+========================================
+Testing
+========================================
+
+The code was tested using the python script in the master branch called "testFileMaker.py" which generated as many and as large txt file as we wanted with as many insets, deletes and adds as we wanted in random places. Different functions were timed using the system time measurement tools and file sizes and compression ratios were empirically measured.
