@@ -216,6 +216,14 @@ public class Locker {
             System.exit(1);
         }
 
+        // now check if it is already in the locker
+        Path checkPath = Paths.get(this.path, ".files", dir.getName() + ".ser");
+        File checkFile = new File(checkPath.toString());
+        if (checkFile.exists()) {
+            System.err.println("A directory by the name " + dir.getName() + " already exists in locker. Exiting.");
+            System.exit(1);
+        }
+
         File [] dirListing = dir.listFiles();
 
         if (!recursiveAdd) {
@@ -286,12 +294,21 @@ public class Locker {
         }
 
         if (this.dirName != null) {
-            Path outDirPath = Paths.get(targetPathStr, this.dirName);
+            Path outDirPath = Paths.get(targetPathStr);
             // create the dir first before writing files
             File dir = new File(outDirPath.toString());
+            System.out.println(dir.toString());
+
+            // check for existence
+            if (dir.exists()) {
+                System.err.println("A directory of name " + dir.getName() + " already exists at input path. Exiting.");
+                System.exit(1);
+            }
+
+            // create parent dir
             try {
                 if (!dir.mkdir()) {
-                    System.err.println("Could not create new directory in locker.");
+                    System.err.println("Could not create new directory to output path.");
                     System.exit(1);
                 }
             } catch (SecurityException e) {
@@ -299,6 +316,7 @@ public class Locker {
                 System.exit(1);
             }
 
+            // write all files
             ArrayList<Thread> threads = new ArrayList<>();
             for (LockerFile lfile : this.dirFiles) {
                 Thread T = new Thread (() -> this.retrieveFileWrite(outDirPath.toString(), lfile));
@@ -318,7 +336,7 @@ public class Locker {
             this.dirFiles = null;
         }
         else {
-            // first load in the file into the LockerFile array
+            // write single file
             LockerFile lfile = null;
             for (LockerFile f : this.files) {
                 if (f.entryName.equals(entryName))
@@ -377,6 +395,7 @@ public class Locker {
      * @param entryName - The path of the file to be deleted from when it was first inserted into the locker.
      */
     public void delete(String entryName) {
+        this.isMutated = true;
         try {
             this.deferredFileLoader(entryName);
         } catch (NoSuchFileException e) {
@@ -387,6 +406,14 @@ public class Locker {
         if (this.dirName != null) {
             Path dirPath = Paths.get(this.path, ".files", this.dirName + ".ser");
             File dir = dirPath.toFile();
+
+            // permission check
+            if (!dir.canWrite()) {
+                System.err.println("You do not have write permission to locker. Exiting.");
+                System.exit(1);
+            }
+
+            // gather entries and delete individually in separate threads
             File [] dirList = dir.listFiles();
             if (dirList == null) {
                 System.err.println("Error deleting directory from locker. Exiting.");
@@ -406,6 +433,15 @@ public class Locker {
                 } catch (InterruptedException e) {
                     System.err.println("Thread interrupted.");
                 }
+            }
+
+            // now delete the dir itself
+            try {
+                if (!dir.delete()) {
+                    System.err.println("All files deleted from locker, but could not delete .files dir.");
+                }
+            } catch (SecurityException e) {
+                e.printStackTrace();
             }
 
             this.dirName = null;
@@ -456,11 +492,15 @@ public class Locker {
 
         // first load in the file into the LockerFile array
         LockerFile targetInLocker = null;
+        this.dirFileListLock.readLock().lock();
         for (LockerFile f : this.dirFiles) {
             String fileName = f.entryName + ".ser";
-            if (fileName.equals(targetOnDisk.getName()))
+            if (fileName.equals(targetOnDisk.getName())) {
                 targetInLocker = f;
+                break;
+            }
         }
+        this.dirFileListLock.readLock().unlock();
 
         if (targetInLocker == null) {
             System.err.println("Could not find file to be deleted in the locker.");
