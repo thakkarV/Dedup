@@ -24,7 +24,7 @@ public class CLIRunner {
             Locker locker = new Locker(
                     this.parsedCommands.getOptionValue("l")
             );
-            locker.addFile(this.parsedCommands.getOptionValue("a"));
+            locker.addFile(this.parsedCommands.getOptionValue("a"), false);
             locker.save();
         }
 
@@ -65,7 +65,7 @@ public class CLIRunner {
                     this.parsedCommands.getOptionValue("l")
             );
 
-            locker.deleteFile(this.parsedCommands.getOptionValue("d"));
+            locker.delete(this.parsedCommands.getOptionValue("d"));
             locker.save();
         }
     }
