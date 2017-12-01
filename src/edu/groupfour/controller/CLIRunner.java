@@ -3,7 +3,7 @@ package edu.groupfour.controller;
 import edu.groupfour.model.Locker;
 import org.apache.commons.cli.CommandLine;
 
-public class CLIRunner {
+class CLIRunner {
     private CommandLine parsedCommands;
     CLIRunner(CommandLine parsedCommands) {
         this.parsedCommands = parsedCommands;

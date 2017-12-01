@@ -278,7 +278,7 @@ public class Locker {
 			}
 
             this.save();
-            
+
 			// recurse on children
             if (!childDirs.isEmpty()) {
                 for(File f : childDirs) {
