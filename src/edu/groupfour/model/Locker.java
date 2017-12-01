@@ -255,7 +255,8 @@ public class Locker {
                 System.err.println("Directory " + dirPath + " is empty. Nothing added to locker.");
                 return;
             }
-            
+
+            ArrayList<File> childDirs = new ArrayList<>();
             for (File f : dirListing) {
                 ArrayList<Thread> threads = new ArrayList<>();
 				if (f.isFile()) {
@@ -265,7 +266,7 @@ public class Locker {
                 }
 
 				else if (f.isDirectory())
-					this.addDir(f.getPath(), true);
+					childDirs.add(f);
 
 				for (Thread T : threads) {
 				    try {
@@ -275,6 +276,15 @@ public class Locker {
                     }
                 }
 			}
+
+            this.save();
+            
+			// recurse on children
+            if (!childDirs.isEmpty()) {
+                for(File f : childDirs) {
+                    this.addDir(f.toString(), true);
+                }
+            }
         }
     }
 
@@ -352,6 +362,11 @@ public class Locker {
         }
     }
 
+    /**
+     * Deserializes from the locker and outputs to disk, a single file
+     * @param targetPathStr
+     * @param lfile
+     */
     private void retrieveFileWrite(String targetPathStr, LockerFile lfile) {
         // read in the chunks and concatenate
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
