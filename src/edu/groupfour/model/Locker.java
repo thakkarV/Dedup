@@ -80,7 +80,7 @@ public class Locker {
                 System.err.println("The provided directory name for the locker already exists. Exiting.");
                 System.exit(1);
             } else {
-                if (!lockerRootDir.mkdir()) {
+                if (!lockerRootDir.mkdirs()) {
                     System.err.println("Could not create new directory at provided path. Exiting.");
 //                    System.exit(1);
                 }
@@ -309,21 +309,17 @@ public class Locker {
             File dir = new File(outDirPath.toString());
             System.out.println(dir.toString());
 
-            // check for existence
-            if (dir.exists()) {
-                System.err.println("A directory of name " + dir.getName() + " already exists at input path. Exiting.");
-                System.exit(1);
-            }
-
-            // create parent dir
-            try {
-                if (!dir.mkdir()) {
-                    System.err.println("Could not create new directory to output path.");
+            // create parent dir if it does not exist
+            if (!dir.exists()) {
+                try {
+                    if (!dir.mkdirs()) {
+                        System.err.println("Could not create new directory to output path.");
+                        System.exit(1);
+                    }
+                } catch (SecurityException e) {
+                    System.err.println("Did not have write permission to locker. Exiting");
                     System.exit(1);
                 }
-            } catch (SecurityException e) {
-                System.err.println("Did not have write permission to locker. Exiting");
-                System.exit(1);
             }
 
             // write all files
@@ -610,7 +606,7 @@ public class Locker {
 
             // first create dir in .files dir of locker
             try {
-                if (!dir.mkdir()) {
+                if (!dir.mkdirs()) {
                     System.err.println("Could not create new directory in locker.");
                     System.exit(1);
                 }
