@@ -18,7 +18,7 @@ public class RabinFingerPrint implements FingerPrint {
         chunkSize = 1000;
     }
 
-    public RabinFingerPrint(int chunkSize) {
+    RabinFingerPrint(int chunkSize) {
         this.windowSize = windowSize;
         this.threshold = threshold;
         window = new byte[windowSize];
@@ -27,7 +27,7 @@ public class RabinFingerPrint implements FingerPrint {
     }
 
     // returns the array list of indexes of where the chunks should begin
-    public ArrayList<Long> getChunkBoundaries(byte [] byteFile) {
+    ArrayList<Long> getChunkBoundaries(byte [] byteFile) {
         int byteIndex = 0;
         long currentIndex = 0; //current index in file
         byte inByte; //current input byte
@@ -65,7 +65,7 @@ public class RabinFingerPrint implements FingerPrint {
                 // flush le buffer
                 windowIndex = 0;
                 rollingHash = 0;
-                for (int l = 0; l < windowSize; l++){
+                for (int l = 0; l < windowSize; l++) {
                     window[l] = inByte;
                     rollingHash = (rollingHash * prime + inByte) % mod;
 
@@ -80,6 +80,7 @@ public class RabinFingerPrint implements FingerPrint {
             inByte = byteFile[byteIndex++];
             currentIndex++;
         }
+
         if(!(indexlist.get(indexlist.size() - 1) == (long)byteFile.length - 1))
             indexlist.add((long)byteFile.length - 1);
 

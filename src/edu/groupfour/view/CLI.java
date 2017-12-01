@@ -25,7 +25,7 @@ import org.apache.commons.cli.*;
          // these are dependent on the previous mutually exclusive operations
          Option locker = new Option("l", "locker", true, "Path to an existing locker.");
          Option lockerName = new Option("n", "name", true, "Name of the root directory of the locker.");
-         Option target = new Option("t", "target", false, "Path to where the file retrieved should go.");
+         Option target = new Option("t", "target", true, "Path to where the file retrieved should go.");
          Option recursiveAdd = new Option("R", "Recursive", false, "True if recursively adding all child directories");
 
          OptionGroup operations = new OptionGroup();

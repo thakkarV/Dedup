@@ -1,12 +1,11 @@
 package edu.groupfour.controller;
 
 import edu.groupfour.model.Locker;
-import edu.groupfour.view.CLI;
 import org.apache.commons.cli.CommandLine;
 
 public class CLIRunner {
     private CommandLine parsedCommands;
-    public CLIRunner(CommandLine parsedCommands) {
+    CLIRunner(CommandLine parsedCommands) {
         this.parsedCommands = parsedCommands;
     }
 
@@ -26,6 +25,7 @@ public class CLIRunner {
                     this.parsedCommands.getOptionValue("l")
             );
             locker.addFile(this.parsedCommands.getOptionValue("a"));
+            locker.save();
         }
 
         // add directory
@@ -66,6 +66,7 @@ public class CLIRunner {
             );
 
             locker.deleteFile(this.parsedCommands.getOptionValue("d"));
+            locker.save();
         }
     }
 }

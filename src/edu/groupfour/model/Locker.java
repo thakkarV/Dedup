@@ -22,6 +22,7 @@ public class Locker {
     transient private ReentrantReadWriteLock mapLock;
     transient private ReentrantReadWriteLock fileListLock;
 
+
     /**
      * Loads or creates a new locker at the specified path.
      * @param path - path to where the locker is located or to be created
@@ -36,6 +37,7 @@ public class Locker {
         this.isMutated = false;
     }
 
+
     /**
      * Loads or creates a new locker at the specified path. If creating, sets the
      * rabin finger print's parameters such that chunk sizes approximates equal to the input size.
@@ -45,7 +47,7 @@ public class Locker {
     public Locker(String path, String lockerName, int chunkSize) {
         if (lockerName == null)
             lockerName = "Locker";
-        
+
         this.path = Paths.get(path, lockerName).toString();
         this.files = new ArrayList<>();
         this.chunkMap = new HashMap<>();
@@ -63,7 +65,7 @@ public class Locker {
     /**
      * Creates a new locker at the path specified by path.
      * First creates the .locker and .files folders.
-     * Then initializes the fingerprinter and saves its parameters to the .locker folder.
+     * Then initializes the finger printer and saves its chunkSize to the .locker folder.
      * @param path - path to where the locker folder will be created
      */
     private void initialize(String path) {
@@ -109,8 +111,14 @@ public class Locker {
      * @param filePath - Path to the file to be added to the locker.
      */
     public void addFile(String filePath) {
-        this.isMutated = true;
         File originFile = new File(filePath);
+
+        // check if a file by this name is already in the locker
+        if (new File(Paths.get(this.path, ".files", originFile.getName()).toString() + ".ser").exists()) {
+            System.err.println("File of this name already exists in the locker. Please rename it and try again.");
+            System.exit(1);
+        }
+
         // first read the file as a large string
         byte [] fileBytes;
         try {
@@ -132,34 +140,39 @@ public class Locker {
         }
 
         ArrayList<String> lockerFileHashes = new ArrayList<>();
-        Long previous = 0L;
-        for (int i = 0; i < boundries.size() - 1; i++) {
+        long previous = -1L; // end of the previous virtual chunk
+        for (Long boundry : boundries) {
             // get file substring (chunk) and its MD5 hash
-            int chunkSize = (int)(boundries.get(i) - previous);
-            byte [] chunk = new byte [chunkSize];
-            System.arraycopy(fileBytes, previous.intValue(), chunk, 0, chunkSize);
+            long currentBound = boundry;
+            int startIndex = (int) (previous + 1);
+            int chunkSize = (int) (currentBound - previous);
+            byte[] chunk = new byte[chunkSize];
 
-            byte [] hash = md.digest(chunk);
+            System.arraycopy(fileBytes, startIndex, chunk, 0, chunkSize);
+
+            byte[] hash = md.digest(chunk);
             String chunkHash = Base64.getEncoder().encodeToString(hash);
 
             // now check if this hash exists in the chunk map
             this.mapLock.readLock().lock();
             if (this.chunkMap.containsKey(chunkHash)) {
+                this.mapLock.readLock().unlock();
                 // if exists, increase reference to the chunk
                 this.mapLock.writeLock().lock();
-                    chunkMap.get(chunkHash).addReference();
+                chunkMap.get(chunkHash).addReference();
                 this.mapLock.writeLock().unlock();
             } else {
+                this.mapLock.readLock().unlock();
                 // else insert a new chunk to the map
                 FileChunk fileChunk = new FileChunk(chunk);
                 this.mapLock.writeLock().lock();
-                    this.chunkMap.put(chunkHash, fileChunk);
+                this.chunkMap.put(chunkHash, fileChunk);
                 this.mapLock.writeLock().unlock();
             }
-            this.mapLock.readLock().unlock();
 
             lockerFileHashes.add(chunkHash);
-            previous = boundries.get(i);
+            previous = currentBound;
+            System.out.println("Added Chunk");
         }
 
         // now insert this new locker file into the array list of locker files
@@ -167,6 +180,9 @@ public class Locker {
         this.fileListLock.writeLock().lock();
             this.files.add(lfile);
         this.fileListLock.writeLock().unlock();
+        this.isMutated = true;
+
+        System.out.println("Added File");
     }
 
     
@@ -231,7 +247,8 @@ public class Locker {
         // read in the chunks and concatenate
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         FileChunk chunk;
-        for (String hash : this.files.get(0).chunkHashes) {
+        LockerFile lfile = this.files.get(0);
+        for (String hash : lfile.chunkHashes) {
             chunk = this.chunkMap.get(hash);
             try {
                 baos.write(chunk.getPayload());
@@ -243,14 +260,15 @@ public class Locker {
 
         // try writing to output path
         try {
-            File f = new File(targetPathStr);
-            if (f.canWrite()) {
-                FileOutputStream fos = new FileOutputStream(f);
-                baos.writeTo(fos);
-                fos.close();
-            } else {
-                System.err.println("Did not have write permission to path. Exiting.");
-            }
+            Path outputPath = Paths.get(targetPathStr, lfile.localFilePath);
+            File f = new File(outputPath.toString());
+            FileOutputStream fos = new FileOutputStream(f);
+            baos.writeTo(fos);
+            baos.close();
+            fos.close();
+        } catch (SecurityException e) {
+            System.err.println("Did not have permission to write to provided output path. Exiting.");
+            System.exit(1);
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(1);
@@ -259,7 +277,8 @@ public class Locker {
             System.exit(1);
         }
     }
-    
+
+
     /**
      * Deletes a given files from the locker. Here the input path is the path of the
      * file that was provided when the file was first inserted into the locker.
@@ -273,6 +292,7 @@ public class Locker {
             return;
         }
 
+        // first load in the file into the LockerFile array
         LockerFile targetFile = null;
         for (LockerFile f : this.files) {
             if (f.localFilePath.equals(localFilePath))
@@ -282,6 +302,19 @@ public class Locker {
         if (targetFile == null) {
             System.err.println("Could not find file to be deleted in the locker.");
             return;
+        }
+
+        // now first delete the serialized LockerFile from disk
+        // if we cannot do this, then we cannot remove the references to these chunks in the main chunkMap
+        File target = new File(Paths.get(this.path, ".files", localFilePath + ".ser").toString());
+        try {
+            if (!target.delete()) {
+                System.err.println("Could not delete file on disk.");
+                System.exit(1);
+            }
+        } catch (SecurityException e) {
+            System.err.println("Did not have permission to delete file on disk. Exiting.");
+            System.exit(1);
         }
 
         // decrement chunk references from the chunk map. Delete if references are zero.
@@ -295,13 +328,8 @@ public class Locker {
 
         // remove the file entry in the files array list
         this.files.remove(targetFile);
-
-        // finally delete the serialized LockerFile from disk
-        File target = new File(Paths.get(this.path, ".files", localFilePath + ".ser").toString());
-        if (!target.delete()) {
-            System.err.println("Could not delete serialized file on disk.");
-        }
     }
+
 
     /**
      * Implements the serialization to save the locker object to disk.
@@ -358,7 +386,7 @@ public class Locker {
      */
     @SuppressWarnings("unchecked")
     private void load() {
-        // set everything's isMutated to flase when loading
+        // set everything's isMutated to false when loading
         // chunk map and finger printer are reloaded every time
         FileInputStream fis;
         ObjectInputStream ois;
@@ -393,7 +421,7 @@ public class Locker {
      * @throws NoSuchFileException - if the serialized object cannot be read.
      */
     private void deferredFileLoader(String localPath) throws NoSuchFileException {
-        Path filePath = Paths.get(this.path, localPath + ".ser");
+        Path filePath = Paths.get(this.path, ".files", localPath + ".ser");
         if (!filePath.toFile().exists())
             throw new NoSuchFileException("File " + localPath + " not found in locker.");
 
@@ -404,6 +432,8 @@ public class Locker {
             ois = new ObjectInputStream(fis);
             LockerFile file = (LockerFile) ois.readObject();
             this.files.add(file);
+            ois.close();
+            fis.close();
         } catch (IOException | ClassNotFoundException e) {
             System.err.println("Error while loading the locker file.");
             e.printStackTrace();
