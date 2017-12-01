@@ -82,7 +82,7 @@ public class Locker {
             } else {
                 if (!lockerRootDir.mkdirs()) {
                     System.err.println("Could not create new directory at provided path. Exiting.");
-//                    System.exit(1);
+                    System.exit(1);
                 }
             }
         } catch (SecurityException e) {
@@ -96,7 +96,7 @@ public class Locker {
             File lockerlockerDir = new File(lockerlockerPath.toString());
             if (!lockerlockerDir.mkdir()) {
                 System.err.println("Could not create new directory at provided path. Exiting.");
-//                    System.exit(1);
+                    System.exit(1);
             }
         } catch (SecurityException e) {
             e.printStackTrace();
@@ -109,7 +109,7 @@ public class Locker {
             File lockerFileDir = new File(lockerFilePath.toString());
             if (!lockerFileDir.mkdir()) {
                 System.err.println("Could not create new directory at provided path. Exiting.");
-//                    System.exit(1);
+                    System.exit(1);
             }
         } catch (SecurityException e) {
             e.printStackTrace();
