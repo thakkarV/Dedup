@@ -49,8 +49,13 @@ import org.apache.commons.cli.*;
         CommandLineParser parser = new DefaultParser();
         CommandLine cmdline = null;
 
+
         try {
             cmdline = parser.parse(this.options, this.args);
+            if (cmdline.hasOption("h")) {
+                showHelp();
+                System.exit(0);
+            }
         } catch (ParseException e) {
             // log.log(Level.SEVERE, "Failed to parse command line arguments.");
             showHelp();
